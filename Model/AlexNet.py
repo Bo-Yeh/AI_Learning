@@ -101,7 +101,7 @@ batch_size = 32                                # Batch Size
 lr = 0.001                                    # Learning Rate
 epochs = 150                                      # epoch 次數
 
-data_dir = 'archive (2)/train'                        # 資料夾名稱
+data_dir = 'C:/Users/Yeh/Desktop/ai_learninig/Image/PetImages/train_small'                        # 資料夾名稱
 
 train_dataloader, test_dataloader = split_Train_Val_Data(data_dir)
 C = models.resnet50 (pretrained=True).to(device)     # 使用內建的 model   >>>> model = torchvision.models.vgg16(weights='IMAGENET1K_V1')
