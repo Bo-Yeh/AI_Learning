@@ -101,22 +101,40 @@ def split_Train_Val_Data(data_dir):
     return train_dataloader, test_dataloader
 
 # 參數設定
-batch_size = 16                                # Batch Size
-lr = 0.001                                    # Learning Rate
-epochs = 150                                       # epoch 次數
+batch_size = 32                                # Batch Size                                 
+#lr =  Learning Rate
+epochs = 100                                       # epoch 次數
 
-data_dir = 'D:/skincaner/test'                        # 資料夾名稱
+# "Image/PetImages/train_small"
+data_dir = "C:/AI_GO/archive (2)/train"                        # 資料夾名稱
+
 
 train_dataloader, test_dataloader = split_Train_Val_Data(data_dir)
 
 C = models.resnet50(pretrained=True).to(device)     # 使用內建的 model   >>>> model = torchvision.models.vgg16(weights='IMAGENET1K_V1')
-optimizer_C = optim.Adam(C.parameters (), lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, amsgrad=False) # 選擇你想用的 optimizer
+optimizer_C = optim.Adam(C.parameters (), lr=0.0003, weight_decay=1e-5 , amsgrad=False) # 選擇你想用的 optimizer
 summary(C, (3, 244, 244))                        # 利用 torchsummary 的 summary package 印出模型資訊，input size: (3 * 224 * 224)
 # Loss function
 criterion = nn.CrossEntropyLoss()                # 選擇想用的 loss function
 
+#學習律調整 餘弦退火
+import torch.optim.lr_scheduler as lr_scheduler 
+
+# 定義一個scheduler 參數自己設置
+scheduler = lr_scheduler.CosineAnnealingLR (optimizer_C, T_max= 10 , eta_min= 1e-5 ) 
+# 如果想用帶熱重啟的，可以向下面這樣設置
+scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer_C, T_0= 10 , T_mult= 1 , eta_min= 1e-5 ) 
+# T_0:學習率第一次回到初始值的epoch位置
+# T_mult:這個控制了學習率變化的速度
+# 如果T_mult=1,則學習率在T_0,2 T_0,3 T_0,....,i*T_0,....處回到最大值(初始學習率)
+# 5,10,15,20,25,.......處回到最大值
+# 如果T_mult>1,則學習率在T_0,(1+T_mult) T_0,(1+T_mult+T_mult**2) T_0,.....,(1+T_mult+T_mult 2+...+T_0 i )*T0,處回到最大值
+# 5,15,35,75,155,.......處回到最大值
+
+
 loss_epoch_C = []
 train_acc, test_acc = [], []
+lr = []
 best_acc, best_auc = 0.0, 0.0
 
 if __name__ == '__main__':    
@@ -128,6 +146,9 @@ if __name__ == '__main__':
         train_loss_C = 0.0
 
         C.train() # 設定 train 或 eval
+        lr.append(scheduler.get_lr()[0])
+        scheduler.step() # 這是關鍵代碼，在每一個epoch最後加上這一行，就可以完成學習率的調整
+        print("lr:",scheduler.get_lr()[0])
         print('epoch: ' + str(epoch + 1) + ' / ' + str(epochs))  
         
         # ---------------------------
@@ -198,5 +219,11 @@ plt.ylabel('acc (%)'), plt.xlabel('epoch')
 plt.legend(['training acc', 'testing acc'], loc = 'upper left')
 plt.savefig(os.path.join(fig_dir, 'acc.png'))
 plt.close() 
+
+plt.figure()
+plt.plot(np.arange(len(lr)),lr) # plot your scheduler
+plt.savefig("scheduler.jpg")
+plt.close() 
+
 
 print('done')
