@@ -55,8 +55,10 @@ train_transformer = transforms.Compose([
 ])
  
 test_transformer = transforms.Compose([
-    transforms.Resize(224),
-    transforms.CenterCrop(224),
+    transforms.Resize(256),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # 調整色度、亮度、飽和度、對比度
     transforms.ToTensor(),
     normalize
 ])
@@ -105,7 +107,7 @@ batch_size = 32                                # Batch Size
 #lr =  Learning Rate
 epochs = 100                                       # epoch 次數
 
-# "Image/PetImages/train_small"
+# "C:/AI_GO/archive (2)/train" Image/PetImages/train_small
 data_dir = "C:/AI_GO/archive (2)/train"                        # 資料夾名稱
 
 
@@ -123,7 +125,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 # 定義一個scheduler 參數自己設置
 scheduler = lr_scheduler.CosineAnnealingLR (optimizer_C, T_max= 10 , eta_min= 1e-5 ) 
 # 如果想用帶熱重啟的，可以向下面這樣設置
-scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer_C, T_0= 10 , T_mult= 1 , eta_min= 1e-5 ) 
+scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer_C, T_0= 10 , T_mult= 10 , eta_min= 1e-5 ) 
 # T_0:學習率第一次回到初始值的epoch位置
 # T_mult:這個控制了學習率變化的速度
 # 如果T_mult=1,則學習率在T_0,2 T_0,3 T_0,....,i*T_0,....處回到最大值(初始學習率)
@@ -137,6 +139,10 @@ train_acc, test_acc = [], []
 lr = []
 best_acc, best_auc = 0.0, 0.0
 
+#保存最佳測試集權種
+best_test_acc = 0.0
+best_model_weights = None
+
 if __name__ == '__main__':    
     for epoch in range(epochs):
         start_time = time.time()
@@ -146,9 +152,6 @@ if __name__ == '__main__':
         train_loss_C = 0.0
 
         C.train() # 設定 train 或 eval
-        lr.append(scheduler.get_lr()[0])
-        scheduler.step() # 這是關鍵代碼，在每一個epoch最後加上這一行，就可以完成學習率的調整
-        print("lr:",scheduler.get_lr()[0])
         print('epoch: ' + str(epoch + 1) + ' / ' + str(epochs))  
         
         # ---------------------------
@@ -169,6 +172,9 @@ if __name__ == '__main__':
             correct_train += (predicted == label).sum()
             train_loss_C += train_loss.item()
             iter += 1
+
+
+
                     
         print('Training epoch: %d / loss_C: %.3f | acc: %.3f' % \
               (epoch + 1, train_loss_C / iter, correct_train / total_train))
@@ -196,6 +202,28 @@ if __name__ == '__main__':
 
         end_time = time.time()
         print('Cost %.3f(secs)' % (end_time - start_time))
+
+        if correct_test / total_test > best_test_acc:
+            best_test_acc = correct_test / total_test
+            best_model_weights = C.state_dict()
+        
+
+        lr.append(scheduler.get_lr()[0])
+        scheduler.step() # 這是關鍵代碼，在每一個epoch最後加上這一行，就可以完成學習率的調整
+        print("lr:",scheduler.get_lr()[0])
+
+    torch.save(best_model_weights, 'best_model_weights.pt') 
+    results_dict = {
+        'train_acc': train_acc,
+        'test_acc': test_acc,
+        'loss_epoch_C': loss_epoch_C,
+        'lr': lr,
+        'best_test_acc': best_test_acc
+    }
+
+    torch.save(results_dict, 'training_results.pt')
+
+
 
 fig_dir = './fig/'
 if not os.path.isdir(fig_dir):
